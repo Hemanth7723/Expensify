@@ -1,0 +1,6 @@
+{
+  "name": "Expensify",
+  "description": "A secure offline daily expense tracker with custom profile management, multi-currency switching, spending analytics, and CSV budget exporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
