@@ -6,7 +6,7 @@
 
 ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
-![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpack-compose&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=for-the-badge&logo=pack-compose&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL%203.0-blue?style=for-the-badge)
 
 [Features](#-features) • [Quick Start](#-quick-start) • [Tech Stack](#-tech-stack) • [Architecture](#-architecture) • [Contributing](#-contributing)
@@ -223,7 +223,7 @@ Expensify/
 │   │   │   │   │   ├── components/
 │   │   │   │   │   │   ├── ExpenseCard.kt
 │   │   │   │   │   │   ├── CategoryFilter.kt
-│   │   │   │   │   │   ├── VoiceSpeechParserPanel.kt
+│   │   │   │   │   │   └── VoiceSpeechParserPanel.kt
 │   │   │   │   │   │   └── AnalyticsChart.kt
 │   │   │   │   │   └── MainActivity.kt
 │   │   │   ├── res/
