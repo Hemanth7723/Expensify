@@ -286,3 +286,8 @@ GPLv3 (see LICENSE)
 ## 📧 Contact & Support
 
 - Issues & Discussions: repository GitHub pages
+
+
+
+
+
