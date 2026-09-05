@@ -58,6 +58,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.Expense
+import com.example.data.model.withEditableFields
 import com.example.ui.ExpenseViewModel
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
@@ -1912,6 +1913,7 @@ fun ExpenseRowItem(
     val (ic, iconColor) = viewModel.getCategoryIconAndColor(expense.category)
 
     var showActionSheet by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -1993,16 +1995,25 @@ fun ExpenseRowItem(
                     if (expense.note.trim().isNotEmpty()) {
                         Text(text = "Context: ${expense.note}", color = ThemeColors.textSecondary(isDark), fontSize = 14.sp)
                     }
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteExpense(expense)
+                            showActionSheet = false
+                        },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Delete Item", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.deleteExpense(expense)
+                        showEditDialog = true
                         showActionSheet = false
                     }
                 ) {
-                    Text("Delete Item", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                    Text("Edit Item", color = ThemeColors.accent(isDark), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -2011,6 +2022,15 @@ fun ExpenseRowItem(
                 }
             },
             containerColor = ThemeColors.surface(isDark)
+        )
+    }
+
+    if (showEditDialog) {
+        ManualAddExpenseDialog(
+            viewModel = viewModel,
+            currency = currency,
+            expenseToEdit = expense,
+            onDismiss = { showEditDialog = false }
         )
     }
 }
@@ -2212,20 +2232,43 @@ fun ProfileEditModal(viewModel: ExpenseViewModel, onDismiss: () -> Unit) {
 fun ManualAddExpenseDialog(
     viewModel: ExpenseViewModel,
     currency: String,
+    expenseToEdit: Expense? = null,
     onDismiss: () -> Unit
 ) {
     val isDark by viewModel.isDarkTheme.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var tInput by remember { mutableStateOf("") }
-    var aInput by remember { mutableStateOf("") }
-    var nInput by remember { mutableStateOf("") }
+    var tInput by remember(expenseToEdit?.id) { mutableStateOf(expenseToEdit?.title.orEmpty()) }
+    var aInput by remember(expenseToEdit?.id) {
+        mutableStateOf(expenseToEdit?.amount?.toString().orEmpty())
+    }
+    var nInput by remember(expenseToEdit?.id) { mutableStateOf(expenseToEdit?.note.orEmpty()) }
+    var selectedTimestamp by remember(expenseToEdit?.id) {
+        mutableStateOf(expenseToEdit?.timestamp ?: System.currentTimeMillis())
+    }
+    var selectedCatIdx by remember(expenseToEdit?.id) {
+        mutableStateOf(
+            expenseToEdit?.let { expense -> viewModel.categories.indexOfFirst { it.equals(expense.category, true) } }
+                ?.takeIf { it >= 0 } ?: 0
+        )
+    }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
     
-    // Choose Category Selector
-    var selectedCatIdx by remember { mutableStateOf(0) }
+    val dateFormatter = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+    val timeFormatter = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Manual Transaction Ledger", color = ThemeColors.textPrimary(isDark), fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+        title = {
+            Text(
+                if (expenseToEdit == null) "Manual Transaction Ledger" else "Edit Transaction",
+                color = ThemeColors.textPrimary(isDark),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -2233,21 +2276,23 @@ fun ManualAddExpenseDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
-                    value = tInput,
-                    onValueChange = { tInput = it },
-                    label = { Text("Title (e.g. Electric Bill)") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = ThemeColors.textPrimary(isDark),
-                        unfocusedTextColor = ThemeColors.textPrimary(isDark),
-                        focusedLabelColor = ThemeColors.accent(isDark),
-                        unfocusedLabelColor = ThemeColors.textSecondary(isDark),
-                        focusedBorderColor = ThemeColors.accent(isDark),
-                        unfocusedBorderColor = ThemeColors.border(isDark)
-                    ),
-                    modifier = Modifier.fillMaxWidth().testTag("manual_title_input"),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                if (expenseToEdit == null) {
+                    OutlinedTextField(
+                        value = tInput,
+                        onValueChange = { tInput = it },
+                        label = { Text("Title (e.g. Electric Bill)") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = ThemeColors.textPrimary(isDark),
+                            unfocusedTextColor = ThemeColors.textPrimary(isDark),
+                            focusedLabelColor = ThemeColors.accent(isDark),
+                            unfocusedLabelColor = ThemeColors.textSecondary(isDark),
+                            focusedBorderColor = ThemeColors.accent(isDark),
+                            unfocusedBorderColor = ThemeColors.border(isDark)
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("manual_title_input"),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
 
                 OutlinedTextField(
                     value = aInput,
@@ -2265,6 +2310,26 @@ fun ManualAddExpenseDialog(
                     modifier = Modifier.fillMaxWidth().testTag("manual_amount_input"),
                     shape = RoundedCornerShape(12.dp)
                 )
+
+                if (expenseToEdit != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(dateFormatter.format(Date(selectedTimestamp)), fontSize = 12.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { showTimePicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(timeFormatter.format(Date(selectedTimestamp)), fontSize = 12.sp)
+                        }
+                    }
+                }
 
                 // Category select
                 Text("Select Category:", fontSize = 12.sp, color = ThemeColors.textSecondary(isDark), fontWeight = FontWeight.SemiBold)
@@ -2305,6 +2370,10 @@ fun ManualAddExpenseDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+
+                if (saveError != null) {
+                    Text(saveError!!, color = Color(0xFFEF4444), fontSize = 12.sp)
+                }
             }
         },
         confirmButton = {
@@ -2312,10 +2381,30 @@ fun ManualAddExpenseDialog(
                 onClick = {
                     val trimmedTitle = tInput.trim()
                     val amount = aInput.trim().toDoubleOrNull() ?: 0.0
-                    if (trimmedTitle.isEmpty()) {
+                    if (expenseToEdit == null && trimmedTitle.isEmpty()) {
                         Toast.makeText(context, "Please enter a transaction title.", Toast.LENGTH_SHORT).show()
                     } else if (amount <= 0) {
                         Toast.makeText(context, "Please enter a valid positive cost amount.", Toast.LENGTH_SHORT).show()
+                    } else if (isSaving) {
+                        Unit
+                    } else if (expenseToEdit != null) {
+                        isSaving = true
+                        saveError = null
+                        viewModel.updateExpense(
+                            expenseToEdit.withEditableFields(
+                                amount = amount,
+                                category = viewModel.categories[selectedCatIdx],
+                                timestamp = selectedTimestamp
+                            ),
+                            onSuccess = {
+                                isSaving = false
+                                onDismiss()
+                            },
+                            onError = {
+                                isSaving = false
+                                saveError = it
+                            }
+                        )
                     } else {
                         viewModel.addExpense(
                              title = trimmedTitle,
@@ -2330,7 +2419,11 @@ fun ManualAddExpenseDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                 modifier = Modifier.background(ThemeColors.accentBrush(isDark), shape = RoundedCornerShape(12.dp))
             ) {
-                Text("Save Ledger", color = Color.White, fontWeight = FontWeight.Bold)
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text(if (expenseToEdit == null) "Save Ledger" else "Save Changes", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         },
         dismissButton = {
@@ -2340,6 +2433,47 @@ fun ManualAddExpenseDialog(
         },
         containerColor = ThemeColors.surface(isDark)
     )
+
+    if (showDatePicker) {
+        val calendar = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+        DisposableEffect(Unit) {
+            val dialog = android.app.DatePickerDialog(
+                context,
+                { _, year, month, day ->
+                    calendar.set(year, month, day)
+                    selectedTimestamp = calendar.timeInMillis
+                    showDatePicker = false
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            )
+            dialog.setOnDismissListener { showDatePicker = false }
+            dialog.show()
+            onDispose { dialog.dismiss() }
+        }
+    }
+
+    if (showTimePicker) {
+        val calendar = Calendar.getInstance().apply { timeInMillis = selectedTimestamp }
+        DisposableEffect(Unit) {
+            val dialog = android.app.TimePickerDialog(
+                context,
+                { _, hour, minute ->
+                    calendar.set(Calendar.HOUR_OF_DAY, hour)
+                    calendar.set(Calendar.MINUTE, minute)
+                    selectedTimestamp = calendar.timeInMillis
+                    showTimePicker = false
+                },
+                calendar.get(Calendar.HOUR_OF_DAY),
+                calendar.get(Calendar.MINUTE),
+                false
+            )
+            dialog.setOnDismissListener { showTimePicker = false }
+            dialog.show()
+            onDispose { dialog.dismiss() }
+        }
+    }
 }
 
 // ==========================================
