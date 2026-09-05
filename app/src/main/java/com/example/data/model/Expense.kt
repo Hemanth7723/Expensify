@@ -12,3 +12,13 @@ data class Expense(
     val timestamp: Long,
     val note: String = ""
 )
+
+fun Expense.withEditableFields(
+    amount: Double,
+    category: String,
+    timestamp: Long
+): Expense = copy(
+    amount = amount,
+    category = category,
+    timestamp = timestamp
+)

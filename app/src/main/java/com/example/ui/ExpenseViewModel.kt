@@ -146,9 +146,18 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun updateExpense(expense: Expense) {
+    fun updateExpense(
+        expense: Expense,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
-            repository.update(expense)
+            try {
+                repository.update(expense)
+                onSuccess()
+            } catch (exception: Exception) {
+                onError(exception.localizedMessage ?: "Unable to save the expense.")
+            }
         }
     }
 
